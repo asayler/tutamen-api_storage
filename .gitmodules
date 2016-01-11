@@ -1,0 +1,3 @@
+[submodule "submodules/tutamen-pytutamen_server"]
+	path = submodules/tutamen-pytutamen_server
+	url = https://github.com/asayler/tutamen-pytutamen_server

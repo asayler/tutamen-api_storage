@@ -18,6 +18,8 @@ TEST_DIR = "./tests/"
 PYTHONPATH = $(shell readlink -f ./)
 EXPORT_PATH = export PYTHONPATH="$(PYTHONPATH)"
 
+TUTSRV_DIR = "./submodules/tutamen-pytutamen_server"
+
 .PHONY: all git reqs conf lint test clean
 
 all:
@@ -29,6 +31,7 @@ git:
 
 reqs:
 	$(PIP) install -r $(REQUIRMENTS) -U
+	$(MAKE) -C $(TUTSRV_DIR) reqs
 
 conf:
 	$(ECHO) "Todo"
