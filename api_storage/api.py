@@ -8,23 +8,27 @@
 ### Imports ###
 import functools
 import uuid
+import datetime
 
 import flask
 import flask.ext.httpauth
 import flask.ext.cors
 
-from . import exceptions
-from tutamen_server import storage
-import pcollections.be_redis_atomic as dso
+from pcollections import drivers
+from pcollections import backends
 
-#import tutamen_server.storage
+from pytutamen_server import datatypes
+from pytutamen_server import storage
+
+from . import exceptions
+from . import config
 
 
 ### Constants ###
 
-_REDIS_DB = 3
+_KEY_CACERT = "cacert"
+_KEY_SIGKEY = "sigkey"
 
-_KEY_AUTHORIZATIONS = "authorizations"
 _KEY_COLLECTIONS = "collections"
 _KEY_SECRETS = "secrets"
 
@@ -45,7 +49,7 @@ if not app.testing:
     import logging
     import logging.handlers
 
-    loggers = [app.logger, logging.getLogger('tutamen')]
+    loggers = [app.logger, logging.getLogger('pytutamen_server')]
 
     formatter_line = logging.Formatter('%(levelname)s: %(module)s - %(message)s')
     formatter_line_time = logging.Formatter('%(asctime)s %(levelname)s: %(module)s - %(message)s')
@@ -76,9 +80,10 @@ if not app.testing:
 
 @app.before_request
 def before_request():
-    driver = dso.Driver(db=_REDIS_DB)
-    ss = storage.StorageServer(driver)
-    flask.g.srv_storage = ss
+
+    flask.g.pdriver = drivers.RedisDriver(db=config.REDIS_DB)
+    flask.g.pbackend = backends.RedisAtomicBackend(flask.g.pdriver)
+    flask.g.srv_ss = storage.StorageServer(flask.g.pbackend, create=False)
 
 @app.teardown_request
 def teardown_request(exception):
@@ -96,17 +101,18 @@ def authenticate_client():
 
             cert_info = flask.request.environ
             status = cert_info['SSL_CLIENT_VERIFY']
-            if status != 'SUCCESS':
-                msg = "Could not verify client cert: {}".format(status)
-                app.logger.error(msg)
-                raise exceptions.SSLClientCertError(msg)
-
-            account_id = cert_info['SSL_CLIENT_S_DN_O']
-            client_id = cert_info['SSL_CLIENT_S_DN_CN']
-            msg = "Authenticated Client '{}' for Account '{}'".format(client_id, account_id)
+            msg = "SSL_CLIENT_VERIFY = '{}'".format(status)
             app.logger.debug(msg)
-            flask.g.account_id = account_id
-            flask.g.client_id = client_id
+
+            # if status != 'SUCCESS':
+            #     msg = "Could not verify client cert: {}".format(status)
+            #     app.logger.error(msg)
+            #     raise exceptions.SSLClientCertError(msg)
+
+            client_uid = uuid.UUID(cert_info['SSL_CLIENT_S_DN_CN'])
+            msg = "Authenticated Client '{}'".format(client_uid)
+            app.logger.debug(msg)
+            flask.g.client_uid = client_id
 
             # Call Function
             return func(*args, **kwargs)
@@ -136,82 +142,54 @@ def get_root():
     app.logger.debug("GET ROOT")
     return app.send_static_file('index.html')
 
-## Authroization Endpoints ##
-
-@app.route("/{}/".format(_KEY_AUTHORIZATIONS), methods=['POST'])
-@authenticate_client()
-def post_authorizations():
-
-    app.logger.debug("POST AUTHORIZATIONS")
-    json_in = flask.request.get_json(force=True)
-    app.logger.debug("json_in = '{}'".format(json_in))
-    permission = json_in['permission']
-    app.logger.debug("permission = '{}'".format(permission))
-    usermetadata = json_in['usermetadata']
-    app.logger.debug("usermetadata = '{}'".format(usermetadata))
-    # ath =
-    # app.logger.debug("ath = '{}'".format(ath))
-    json_out = {_KEY_AUTHORIZATIONS: [str(uuid.uuid4())]}
-    return flask.jsonify(json_out)
-
-@app.route("/{}/<auth_uid>/status/".format(_KEY_AUTHORIZATIONS), methods=['GET'])
-@authenticate_client()
-def get_authorizations_status(auth_uid):
-
-    app.logger.debug("GET AUTHORIZATIONS STATUS")
-    # ath =
-    # app.logger.debug("ath = '{}'".format(ath))
-    status = "granted"
-    json_out = {'status': status}
-    return flask.jsonify(json_out)
-
-@app.route("/{}/<auth_uid>/token/".format(_KEY_AUTHORIZATIONS), methods=['GET'])
-@authenticate_client()
-def get_authorizations_token(auth_uid):
-
-    app.logger.debug("GET AUTHORIZATIONS TOKEN")
-    # ath =
-    # app.logger.debug("ath = '{}'".format(ath))
-    token = "1128e2ad63a0309c9f1788780c5b5e237310d62acc120ad75167e08d9671da43"
-    json_out = {'token': token}
-    return flask.jsonify(json_out)
-
-
 ## Storage Endpoints ##
 
 @app.route("/{}/".format(_KEY_COLLECTIONS), methods=['POST'])
 @authenticate_client()
-@httpauth.login_required
+#@httpauth.login_required
 def post_collections():
 
     app.logger.debug("POST COLLECTIONS")
 
     json_in = flask.request.get_json(force=True)
     app.logger.debug("json_in = '{}'".format(json_in))
-    usermetadata = json_in.get('usermetadata', {})
-    app.logger.debug("usermetadata = '{}'".format(usermetadata))
 
-    col = ss.collections_create(usermetadata=usermetadata)
+    uid = json_in.get('uid', None)
+    app.logger.debug("uid = '{}'".format(uid))
+    userdata = json_in.get('userdata', {})
+    app.logger.debug("userdata = '{}'".format(userdata))
+    ac_servers = json_in.get('ac_servers')
+    app.logger.debug("ac_servers = '{}'".format(ac_server))
+    ac_required = json_in.get('ac_required', len(ac_servers))
+    app.logger.debug("ac_required = '{}'".format(ac_required))
+
+    col = flask.g.srv_ss.collections.create(key=uid, userdata=userdata,
+                                            ac_servers=ac_servers, ac_required=ac_required)
     app.logger.debug("col.key = '{}'".format(col.key))
+
     json_out = {_KEY_COLLECTIONS: [col.key]}
     return flask.jsonify(json_out)
 
 @app.route("/{}/<col_uid>/{}/".format(_KEY_COLLECTIONS, _KEY_SECRETS), methods=['POST'])
 @authenticate_client()
-@httpauth.login_required
+#@httpauth.login_required
 def post_collections_secrets(col_uid):
 
     app.logger.debug("POST COLLECTIONS SECRETS")
+    app.logger.debug("col_uid = '{}'".format(col_uid))
     col = ss.collections_get(key=col_uid)
 
     json_in = flask.request.get_json(force=True)
     app.logger.debug("json_in = '{}'".format(json_in))
-    data = json_in.get('data', "")
-    app.logger.debug("data = '{}'".format(data))
-    usermetadata = json_in.get('metadata', {})
-    app.logger.debug("usermetadata = '{}'".format(usermetadata))
 
-    sec = col.secrets_create(data=data, usermetadata=usermetadata)
+    sec_uid = json_in.get('uid', None)
+    app.logger.debug("sec_uid = '{}'".format(sec_uid))
+    userdata = json_in.get('userdata', {})
+    app.logger.debug("userdata = '{}'".format(userdata))
+    data = json_in.get('data')
+    app.logger.debug("data = '{}'".format(data))
+
+    sec = col.secrets.create(key=sec_uid, data=data, userdata=userdata)
     app.logger.debug("sec.key = '{}'".format(sec.key))
     json_out = {_KEY_SECRETS: [sec.key]}
     return flask.jsonify(json_out)
@@ -219,44 +197,62 @@ def post_collections_secrets(col_uid):
 @app.route("/{}/<col_uid>/{}/<sec_uid>/versions/latest/".format(_KEY_COLLECTIONS, _KEY_SECRETS),
            methods=['GET'])
 @authenticate_client()
-@httpauth.login_required
+#@httpauth.login_required
 def get_collections_secret_versions_latest(col_uid, sec_uid):
 
     app.logger.debug("GET COLLECTIONS SECRET VERSIONS LATEST")
-    col = ss.collections_get(key=col_uid)
+    col = ss.collections.get(key=col_uid)
     app.logger.debug("col.key = '{}'".format(col.key))
-    sec = col.secrets_get(key=sec_uid)
+    sec = col.secrets.get(key=sec_uid)
     app.logger.debug("sec.key = '{}'".format(sec.key))
 
-    json_out = {'data': sec.data, 'usermetadata': sec.usermetadata}
+    json_out = {'data': sec.data, 'userdata': sec.userdata}
     return flask.jsonify(json_out)
 
 
 ### Error Handling ###
 
-@app.errorhandler(KeyError)
-def bad_key(error):
-    err = { 'status': 400,
+# @app.errorhandler(KeyError)
+# def bad_key(error):
+#     err = { 'status': 400,
+#             'message': "{}".format(error) }
+#     app.logger.info("Client Error: KeyError: {}".format(err))
+#     res = flask.jsonify(err)
+#     res.status_code = err['status']
+#     return res
+
+# @app.errorhandler(ValueError)
+# def bad_value(error):
+#     err = { 'status': 400,
+#             'message': "{}".format(error) }
+#     app.logger.info("Client Error: ValueError: {}".format(err))
+#     res = flask.jsonify(err)
+#     res.status_code = err['status']
+#     return res
+
+# @app.errorhandler(TypeError)
+# def bad_type(error):
+#     err = { 'status': 400,
+#             'message': "{}".format(error) }
+#     app.logger.info("Client Error: TypeError: {}".format(err))
+#     res = flask.jsonify(err)
+#     res.status_code = err['status']
+#     return res
+
+@app.errorhandler(datatypes.ObjectExists)
+def object_exists(error):
+    err = { 'status': 409,
             'message': "{}".format(error) }
-    app.logger.info("Client Error: KeyError: {}".format(err))
+    app.logger.info("Client Error: ObjectExists: {}".format(err))
     res = flask.jsonify(err)
     res.status_code = err['status']
     return res
 
-@app.errorhandler(ValueError)
-def bad_value(error):
-    err = { 'status': 400,
+@app.errorhandler(datatypes.ObjectDNE)
+def object_exists(error):
+    err = { 'status': 404,
             'message': "{}".format(error) }
-    app.logger.info("Client Error: ValueError: {}".format(err))
-    res = flask.jsonify(err)
-    res.status_code = err['status']
-    return res
-
-@app.errorhandler(TypeError)
-def bad_type(error):
-    err = { 'status': 400,
-            'message': "{}".format(error) }
-    app.logger.info("Client Error: TypeError: {}".format(err))
+    app.logger.info("Client Error: Object Does Not Exist: {}".format(err))
     res = flask.jsonify(err)
     res.status_code = err['status']
     return res
