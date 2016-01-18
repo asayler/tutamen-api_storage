@@ -12,6 +12,9 @@
 class APIError(Exception):
     pass
 
+class TokensError(APIError):
+    pass
+
 class SSLError(APIError):
     pass
 

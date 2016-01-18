@@ -94,17 +94,26 @@ def teardown_request(exception):
 
 ### Auth Decorators ###
 
-def verify_tokens():
+def get_tokens():
 
     def _decorator(func):
 
         @functools.wraps(func)
         def _wrapper(*args, **kwargs):
 
-            tokens = flask.request.headers.get(_TOKENS_HEADER)
+            tokens = flask.request.headers.get(_TOKENS_HEADER, "")
             app.logger.debug("raw_tokens = {}".format(tokens))
+
+            if not tokens:
+                raise TokensError("Client sent no tokens")
+
             tokens = tokens.split(_TOKENS_DELIMINATOR)
             app.logger.debug("parsed_tokens = {}".format(tokens))
+
+            if not tokens:
+                raise TokensError("Client sent no tokens")
+
+            flask.g.tokens = tokens
 
             # Call Function
             return func(*args, **kwargs)
@@ -137,7 +146,7 @@ def get_root():
 ## Storage Endpoints ##
 
 @app.route("/{}/".format(_KEY_COLLECTIONS), methods=['POST'])
-@verify_tokens()
+@get_tokens()
 def post_collections():
 
     app.logger.debug("POST COLLECTIONS")
@@ -162,7 +171,7 @@ def post_collections():
     return flask.jsonify(json_out)
 
 @app.route("/{}/<col_uid>/{}/".format(_KEY_COLLECTIONS, _KEY_SECRETS), methods=['POST'])
-@verify_tokens()
+@get_tokens()
 def post_collections_secrets(col_uid):
 
     app.logger.debug("POST COLLECTIONS SECRETS")
@@ -186,7 +195,7 @@ def post_collections_secrets(col_uid):
 
 @app.route("/{}/<col_uid>/{}/<sec_uid>/versions/latest/".format(_KEY_COLLECTIONS, _KEY_SECRETS),
            methods=['GET'])
-@verify_tokens()
+@get_tokens()
 def get_collections_secret_versions_latest(col_uid, sec_uid):
 
     app.logger.debug("GET COLLECTIONS SECRET VERSIONS LATEST")
@@ -246,11 +255,11 @@ def object_exists(error):
     res.status_code = err['status']
     return res
 
-@app.errorhandler(exceptions.SSLClientCertError)
-def bad_cert(error):
+@app.errorhandler(exceptions.TokensError)
+def bad_tokens(error):
     err = { 'status': 401,
             'message': "{}".format(error) }
-    app.logger.info("Client Error: SSLClientCertError: {}".format(err))
+    app.logger.info("Client Error: TokensError: {}".format(err))
     res = flask.jsonify(err)
     res.status_code = err['status']
     return res
