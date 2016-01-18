@@ -35,13 +35,13 @@ _KEY_SECRETS = "secrets"
 _TOKENS_HEADER = 'tutamen-tokens'
 _TOKENS_DELIMINATOR = ':'
 
+
 ### Global Setup ###
 
 app = flask.Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 app.debug = False
 cors = flask.ext.cors.CORS(app, headers=["Content-Type", "Authorization"])
-httpauth = flask.ext.httpauth.HTTPBasicAuth()
 
 
 ### Logging ###
@@ -121,17 +121,6 @@ def get_tokens():
         return _wrapper
 
     return _decorator
-
-@httpauth.verify_password
-def verify_login(username, password):
-
-    # Note: Token limited to 255 chars
-    token = username
-    app.logger.debug("verify_token: token={}".format(token))
-
-    flask.g.token = None
-
-    return True
 
 ### Endpoints ###
 
