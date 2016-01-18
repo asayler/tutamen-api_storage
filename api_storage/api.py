@@ -102,8 +102,9 @@ def verify_tokens():
         def _wrapper(*args, **kwargs):
 
             tokens = flask.request.headers.get(_TOKENS_HEADER)
+            app.logger.debug("raw_tokens = {}".format(tokens))
             tokens = tokens.split(_TOKENS_DELIMINATOR)
-            app.logger.debug("tokens = {}".format(tokens))
+            app.logger.debug("parsed_tokens = {}".format(tokens))
 
             # Call Function
             return func(*args, **kwargs)
