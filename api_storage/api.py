@@ -32,6 +32,8 @@ _KEY_SIGKEY = "sigkey"
 _KEY_COLLECTIONS = "collections"
 _KEY_SECRETS = "secrets"
 
+_TOKENS_HEADER = 'tutamen-tokens'
+_TOKENS_DELIMINATOR = ':'
 
 ### Global Setup ###
 
@@ -92,27 +94,16 @@ def teardown_request(exception):
 
 ### Auth Decorators ###
 
-def authenticate_client():
+def verify_tokens():
 
     def _decorator(func):
 
         @functools.wraps(func)
         def _wrapper(*args, **kwargs):
 
-            cert_info = flask.request.environ
-            status = cert_info['SSL_CLIENT_VERIFY']
-            msg = "SSL_CLIENT_VERIFY = '{}'".format(status)
-            app.logger.debug(msg)
-
-            # if status != 'SUCCESS':
-            #     msg = "Could not verify client cert: {}".format(status)
-            #     app.logger.error(msg)
-            #     raise exceptions.SSLClientCertError(msg)
-
-            client_uid = uuid.UUID(cert_info['SSL_CLIENT_S_DN_CN'])
-            msg = "Authenticated Client '{}'".format(client_uid)
-            app.logger.debug(msg)
-            flask.g.client_uid = client_id
+            tokens = flask.request.headers.get[_TOKENS_HEADER]
+            tokens = tokens.split(_TOKENS_DELIMINATOR)
+            app.logger.debug("tokens = {}".format(tokens))
 
             # Call Function
             return func(*args, **kwargs)
@@ -145,8 +136,7 @@ def get_root():
 ## Storage Endpoints ##
 
 @app.route("/{}/".format(_KEY_COLLECTIONS), methods=['POST'])
-@authenticate_client()
-#@httpauth.login_required
+@verify_tokens()
 def post_collections():
 
     app.logger.debug("POST COLLECTIONS")
@@ -171,8 +161,7 @@ def post_collections():
     return flask.jsonify(json_out)
 
 @app.route("/{}/<col_uid>/{}/".format(_KEY_COLLECTIONS, _KEY_SECRETS), methods=['POST'])
-@authenticate_client()
-#@httpauth.login_required
+@verify_tokens()
 def post_collections_secrets(col_uid):
 
     app.logger.debug("POST COLLECTIONS SECRETS")
@@ -196,8 +185,7 @@ def post_collections_secrets(col_uid):
 
 @app.route("/{}/<col_uid>/{}/<sec_uid>/versions/latest/".format(_KEY_COLLECTIONS, _KEY_SECRETS),
            methods=['GET'])
-@authenticate_client()
-#@httpauth.login_required
+@verify_tokens()
 def get_collections_secret_versions_latest(col_uid, sec_uid):
 
     app.logger.debug("GET COLLECTIONS SECRET VERSIONS LATEST")
