@@ -17,6 +17,8 @@ import flask.ext.cors
 from pcollections import drivers
 from pcollections import backends
 
+from pytutamen_server import constants
+from pytutamen_server import utility
 from pytutamen_server import datatypes
 from pytutamen_server import storage
 
@@ -42,6 +44,7 @@ app = flask.Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
 app.debug = False
 cors = flask.ext.cors.CORS(app, headers=["Content-Type", "Authorization"])
+sigkey_manager = utility.SigkeyManager()
 
 
 ### Logging ###
@@ -105,13 +108,17 @@ def get_tokens():
             app.logger.debug("raw_tokens = {}".format(tokens))
 
             if not tokens:
-                raise TokensError("Client sent no tokens")
+                msg = "Client sent blank or missing token header"
+                app.logger.warning(msg)
+                raise exceptions.TokensError(msg)
 
             tokens = tokens.split(_TOKENS_DELIMINATOR)
             app.logger.debug("parsed_tokens = {}".format(tokens))
 
             if not tokens:
-                raise TokensError("Client sent no tokens")
+                msg = "Client sent no parsable tokens"
+                app.logger.warning(msg)
+                raise exceptions.TokensError(msg)
 
             flask.g.tokens = tokens
 
@@ -140,9 +147,28 @@ def post_collections():
 
     app.logger.debug("POST COLLECTIONS")
 
+    # Verify Tokens
+    objperm = constants.PERM_SRV_COL_CREATE
+    objtype = constants.TYPE_SRV
+    servers = config.AC_SERVERS
+    cnt = 0
+    for token in flak.g.tokens:
+        server = utility.verify_auth_token(token, servers, objperm, objtype,
+                                           manager=sigkey_manager)
+        if server:
+            servers.remove(server)
+            cnt += 1
+    if cnt < config.AC_REQUIRED:
+        msg = "Failed to verify enough tokens: {} of {}".format(cnt, config.AC_REQUIRED)
+        app.logger.warning(msg)
+        raise exceptions.TokensError(msg)
+    else:
+        msg = "Verified {} tokens".format(cnt)
+        app.logger.debug(msg)
+
+    # Parse JSON
     json_in = flask.request.get_json(force=True)
     app.logger.debug("json_in = '{}'".format(json_in))
-
     uid = json_in.get('uid', None)
     app.logger.debug("uid = '{}'".format(uid))
     userdata = json_in.get('userdata', {})
@@ -152,10 +178,12 @@ def post_collections():
     ac_required = json_in.get('ac_required', len(ac_servers))
     app.logger.debug("ac_required = '{}'".format(ac_required))
 
+    # Create Collection
     col = flask.g.srv_ss.collections.create(key=uid, userdata=userdata,
                                             ac_servers=ac_servers, ac_required=ac_required)
     app.logger.debug("col.key = '{}'".format(col.key))
 
+    # Return UUID
     json_out = {_KEY_COLLECTIONS: [col.key]}
     return flask.jsonify(json_out)
 
