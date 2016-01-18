@@ -101,7 +101,7 @@ def verify_tokens():
         @functools.wraps(func)
         def _wrapper(*args, **kwargs):
 
-            tokens = flask.request.headers.get[_TOKENS_HEADER]
+            tokens = flask.request.headers.get(_TOKENS_HEADER)
             tokens = tokens.split(_TOKENS_DELIMINATOR)
             app.logger.debug("tokens = {}".format(tokens))
 
@@ -149,7 +149,7 @@ def post_collections():
     userdata = json_in.get('userdata', {})
     app.logger.debug("userdata = '{}'".format(userdata))
     ac_servers = json_in.get('ac_servers')
-    app.logger.debug("ac_servers = '{}'".format(ac_server))
+    app.logger.debug("ac_servers = '{}'".format(ac_servers))
     ac_required = json_in.get('ac_required', len(ac_servers))
     app.logger.debug("ac_required = '{}'".format(ac_required))
 
