@@ -17,6 +17,8 @@ SEC_REDIS = "redis"
 config.add_section(SEC_REDIS)
 SEC_LOGGING = "logging"
 config.add_section(SEC_LOGGING)
+SEC_AC = "accesscontrol"
+config.add_section(SEC_AC)
 
 # Filenames and Paths
 
@@ -42,6 +44,8 @@ config.set(SEC_REDIS, 'PASSWORD', None)
 config.set(SEC_LOGGING, 'ENABLED', "True")
 config.set(SEC_LOGGING, 'PATH', LOG_PATH)
 
+config.set(SEC_AC, 'SERVERS', "")
+
 # Read Config File
 
 for path in CONF_PATHS:
@@ -66,3 +70,6 @@ LOGGING_ENABLED = LOGGING_ENABLED.lower() in ['true', 'yes', 'on', '1']
 LOGGING_PATH = os.environ.get('TUTAMEN_API_SS_LOGGING_PATH',
                               config.get(SEC_LOGGING, 'PATH'))
 LOGGING_PATH = os.path.realpath(LOGGING_PATH)
+
+AC_SERVERS = os.environ.get('TUTAMEN_API_SS_AC_SERVERS',
+                            config.get(SEC_AC, 'SERVERS')).split(',')
