@@ -105,7 +105,6 @@ def get_tokens():
         def _wrapper(*args, **kwargs):
 
             tokens = flask.request.headers.get(_TOKENS_HEADER, "")
-            app.logger.debug("raw_tokens = {}".format(tokens))
 
             if not tokens:
                 msg = "Client sent blank or missing token header"
@@ -113,7 +112,7 @@ def get_tokens():
                 raise exceptions.TokensError(msg)
 
             tokens = tokens.split(_TOKENS_DELIMINATOR)
-            app.logger.debug("parsed_tokens = {}".format(tokens))
+            app.logger.debug("tokens = {}".format(tokens))
 
             if not tokens:
                 msg = "Client sent no parsable tokens"
@@ -150,13 +149,15 @@ def post_collections():
     # Verify Tokens
     objperm = constants.PERM_SRV_COL_CREATE
     objtype = constants.TYPE_SRV
-    servers = config.AC_SERVERS
+    remaining = list(config.AC_SERVERS)
     cnt = 0
-    for token in flak.g.tokens:
-        server = utility.verify_auth_token(token, servers, objperm, objtype,
+    for token in flask.g.tokens:
+        server = utility.verify_auth_token(token, remaining, objperm, objtype,
                                            manager=sigkey_manager)
         if server:
-            servers.remove(server)
+            msg = "Verifed token '{}' via server '{}'".format(token, server)
+            app.logger.debug(msg)
+            remaining.remove(server)
             cnt += 1
     if cnt < config.AC_REQUIRED:
         msg = "Failed to verify enough tokens: {} of {}".format(cnt, config.AC_REQUIRED)
