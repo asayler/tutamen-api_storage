@@ -45,6 +45,7 @@ config.set(SEC_LOGGING, 'ENABLED', "True")
 config.set(SEC_LOGGING, 'PATH', LOG_PATH)
 
 config.set(SEC_AC, 'SERVERS', "")
+config.set(SEC_AC, 'REQUIRED', None)
 
 # Read Config File
 
@@ -71,5 +72,11 @@ LOGGING_PATH = os.environ.get('TUTAMEN_API_SS_LOGGING_PATH',
                               config.get(SEC_LOGGING, 'PATH'))
 LOGGING_PATH = os.path.realpath(LOGGING_PATH)
 
-AC_SERVERS = os.environ.get('TUTAMEN_API_SS_AC_SERVERS',
-                            config.get(SEC_AC, 'SERVERS')).split(',')
+AC_SERVERS = list(os.environ.get('TUTAMEN_API_SS_AC_SERVERS',
+                                 config.get(SEC_AC, 'SERVERS')).split(','))
+AC_REQUIRED = os.environ.get('TUTAMEN_API_SS_AC_REQUIRED',
+                             config.get(SEC_AC, 'REQUIRED'))
+if not AC_REQUIRED:
+    AC_REQUIRED = len(AC_SERVERS)
+else:
+    AC_REQUIRED = int(AC_REQUIRED)
