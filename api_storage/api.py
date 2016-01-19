@@ -186,7 +186,7 @@ def post_collections_secrets(col_uid):
 
     # Get Collection
     app.logger.debug("col_uid = '{}'".format(col_uid))
-    col = ss.collections_get(key=col_uid)
+    col = flask.g.srv_ss.collections.get(key=col_uid)
 
     # Verify Tokens
     objperm = constants.PERM_COL_CREATE
@@ -220,7 +220,7 @@ def get_collections_secret_versions_latest(col_uid, sec_uid):
     app.logger.debug("GET COLLECTIONS SECRET VERSIONS LATEST")
 
     # Get Collection
-    col = ss.collections.get(key=col_uid)
+    col = flask.g.srv_ss.collections.get(key=col_uid)
     app.logger.debug("col.key = '{}'".format(col.key))
 
     # Verify Tokens
