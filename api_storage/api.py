@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 # Andy Sayler
-# Copyright 2015
+# Copyright 2015, 2016
 
 
 ### Imports ###
+
 import functools
 import uuid
 import datetime
@@ -36,6 +37,9 @@ _KEY_SECRETS = "secrets"
 
 _TOKENS_HEADER = 'tutamen-tokens'
 _TOKENS_DELIMINATOR = ':'
+
+_EP_COL = "/{}/<col_uid>".format(_KEY_COLLECTIONS)
+_EP_SEC = "/{}/<sec_uid>".format(_KEY_SECRETS)
 
 
 ### Global Setup ###
@@ -149,23 +153,8 @@ def post_collections():
     # Verify Tokens
     objperm = constants.PERM_SRV_COL_CREATE
     objtype = constants.TYPE_SRV
-    remaining = list(config.AC_SERVERS)
-    cnt = 0
-    for token in flask.g.tokens:
-        server = utility.verify_auth_token(token, remaining, objperm, objtype,
-                                           manager=sigkey_manager)
-        if server:
-            msg = "Verifed token '{}' via server '{}'".format(token, server)
-            app.logger.debug(msg)
-            remaining.remove(server)
-            cnt += 1
-    if cnt < config.AC_REQUIRED:
-        msg = "Failed to verify enough tokens: {} of {}".format(cnt, config.AC_REQUIRED)
-        app.logger.warning(msg)
-        raise exceptions.TokensError(msg)
-    else:
-        msg = "Verified {} tokens".format(cnt)
-        app.logger.debug(msg)
+    utility.verify_auth_token_list(flask.g.tokens, config.AC_SERVERS, config.AC_REQUIRED,
+                                   objperm, objtype, manager=sigkey_manager)
 
     # Parse JSON
     json_in = flask.request.get_json(force=True)
@@ -188,17 +177,27 @@ def post_collections():
     json_out = {_KEY_COLLECTIONS: [col.key]}
     return flask.jsonify(json_out)
 
-@app.route("/{}/<col_uid>/{}/".format(_KEY_COLLECTIONS, _KEY_SECRETS), methods=['POST'])
+
+@app.route("{}/{}/".format(_EP_COL, _KEY_SECRETS), methods=['POST'])
 @get_tokens()
 def post_collections_secrets(col_uid):
 
     app.logger.debug("POST COLLECTIONS SECRETS")
+
+    # Get Collection
     app.logger.debug("col_uid = '{}'".format(col_uid))
     col = ss.collections_get(key=col_uid)
 
+    # Verify Tokens
+    objperm = constants.PERM_COL_CREATE
+    objtype = constants.TYPE_COL
+    objuid = col.uid
+    utility.verify_auth_token_list(flask.g.tokens, col.ac_servers, col.ac_required,
+                                   objperm, objtype, objuid, manager=sigkey_manager)
+
+    # Parse JSON
     json_in = flask.request.get_json(force=True)
     app.logger.debug("json_in = '{}'".format(json_in))
-
     sec_uid = json_in.get('uid', None)
     app.logger.debug("sec_uid = '{}'".format(sec_uid))
     userdata = json_in.get('userdata', {})
@@ -206,22 +205,36 @@ def post_collections_secrets(col_uid):
     data = json_in.get('data')
     app.logger.debug("data = '{}'".format(data))
 
+    # Create Secret
     sec = col.secrets.create(key=sec_uid, data=data, userdata=userdata)
     app.logger.debug("sec.key = '{}'".format(sec.key))
+
+    # Return UUID
     json_out = {_KEY_SECRETS: [sec.key]}
     return flask.jsonify(json_out)
 
-@app.route("/{}/<col_uid>/{}/<sec_uid>/versions/latest/".format(_KEY_COLLECTIONS, _KEY_SECRETS),
-           methods=['GET'])
+@app.route("{}{}/verisons/latest/".format(_EP_COL, _EP_SEC), methods=['GET'])
 @get_tokens()
 def get_collections_secret_versions_latest(col_uid, sec_uid):
 
     app.logger.debug("GET COLLECTIONS SECRET VERSIONS LATEST")
+
+    # Get Collection
     col = ss.collections.get(key=col_uid)
     app.logger.debug("col.key = '{}'".format(col.key))
+
+    # Verify Tokens
+    objperm = constants.PERM_COL_READ
+    objtype = constants.TYPE_COL
+    objuid = col.uid
+    utility.verify_auth_token_list(flask.g.tokens, col.ac_servers, col.ac_required,
+                                   objperm, objtype, objuid, manager=sigkey_manager)
+
+    # Get Secret
     sec = col.secrets.get(key=sec_uid)
     app.logger.debug("sec.key = '{}'".format(sec.key))
 
+    # Return Secret
     json_out = {'data': sec.data, 'userdata': sec.userdata}
     return flask.jsonify(json_out)
 
@@ -278,6 +291,15 @@ def bad_tokens(error):
     err = { 'status': 401,
             'message': "{}".format(error) }
     app.logger.info("Client Error: TokensError: {}".format(err))
+    res = flask.jsonify(err)
+    res.status_code = err['status']
+    return res
+
+@app.errorhandler(utility.TokenVerificationFailed)
+def failed_tokens(error):
+    err = { 'status': 401,
+            'message': "{}".format(error) }
+    app.logger.info("Client Error: TokenVerificationFailed: {}".format(err))
     res = flask.jsonify(err)
     res.status_code = err['status']
     return res
