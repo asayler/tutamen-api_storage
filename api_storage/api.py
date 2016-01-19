@@ -304,6 +304,15 @@ def failed_tokens(error):
     res.status_code = err['status']
     return res
 
+@app.errorhandler(utility.SigkeyGetError)
+def failed_sigkey(error):
+    err = { 'status': 400,
+            'message': "{}".format(error) }
+    app.logger.info("Client Error: SigkeyGetError: {}".format(err))
+    res = flask.jsonify(err)
+    res.status_code = err['status']
+    return res
+
 @app.errorhandler(400)
 def bad_request(error=False):
     err = { 'status': 400,
