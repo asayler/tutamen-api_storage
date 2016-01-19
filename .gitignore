@@ -3,3 +3,6 @@
 
 # Python Cruft
 *.pyc
+
+# Config Files
+tutamen_api_ss.conf
