@@ -203,7 +203,7 @@ def post_collections_secrets(col_uid):
     userdata = json_in.get('userdata', {})
     app.logger.debug("userdata = '{}'".format(userdata))
     data = json_in.get('data')
-    app.logger.debug("data = '{}'".format(data))
+    app.logger.debug("data = REDACTED")
 
     # Create Secret
     sec = col.secrets.create(key=sec_uid, data=data, userdata=userdata)
