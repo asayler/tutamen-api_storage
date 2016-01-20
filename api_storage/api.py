@@ -213,7 +213,7 @@ def post_collections_secrets(col_uid):
     json_out = {_KEY_SECRETS: [sec.key]}
     return flask.jsonify(json_out)
 
-@app.route("{}{}/verisons/latest/".format(_EP_COL, _EP_SEC), methods=['GET'])
+@app.route("{}{}/versions/latest/".format(_EP_COL, _EP_SEC), methods=['GET'])
 @get_tokens()
 def get_collections_secret_versions_latest(col_uid, sec_uid):
 
