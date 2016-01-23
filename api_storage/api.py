@@ -151,8 +151,8 @@ def post_collections():
     app.logger.debug("POST COLLECTIONS")
 
     # Verify Tokens
-    objperm = constants.PERM_SRV_COL_CREATE
-    objtype = constants.TYPE_SRV
+    objperm = constants.PERM_CREATE
+    objtype = constants.TYPE_SRV_STORAGE
     utility.verify_auth_token_list(flask.g.tokens, config.AC_SERVERS, config.AC_REQUIRED,
                                    objperm, objtype, manager=sigkey_manager)
 
@@ -189,7 +189,7 @@ def post_collections_secrets(col_uid):
     col = flask.g.srv_ss.collections.get(key=col_uid)
 
     # Verify Tokens
-    objperm = constants.PERM_COL_CREATE
+    objperm = constants.PERM_CREATE
     objtype = constants.TYPE_COL
     objuid = col.uid
     utility.verify_auth_token_list(flask.g.tokens, col.ac_servers, col.ac_required,
@@ -224,7 +224,7 @@ def get_collections_secret_versions_latest(col_uid, sec_uid):
     app.logger.debug("col.key = '{}'".format(col.key))
 
     # Verify Tokens
-    objperm = constants.PERM_COL_READ
+    objperm = constants.PERM_READ
     objtype = constants.TYPE_COL
     objuid = col.uid
     utility.verify_auth_token_list(flask.g.tokens, col.ac_servers, col.ac_required,
