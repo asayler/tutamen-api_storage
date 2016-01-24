@@ -1,17 +1,29 @@
-### Storage Server Endpoints ###
+### Implemented Storage Endpoints ###
+
+<VERB>   <PATH>                           <cert>   <objtype>        <perm>   <Description>
+-------------------------------------------------------------------------------------------
+
+GET     /                                   No       none            none     Welcome Message
+
+-------------------------------------------------------------------------------------------
+
+POST    /collections/                       No       storageserver   create   Create Collection
+POST    /collections/<uid>/secrets/         No       collection      create   Create Secret
+GET     ''/<uid>/versions/latest/           No       collection      read     Get Secret (latest)
+
+-------------------------------------------------------------------------------------------
+
+
+### Planned Storage Endpoints ###
 
 <VERB>   <PATH>                                          <Perms>              <Description>
 -------------------------------------------------------------------------------------------
 
-GET     /                                                none                 Welcome Message
-
 GET     /collections/                                      srv-collection-read    List Collections
-POST    /collections/                                      srv-collection-create  Create Collection
-GET     /collections/<uid>/                                collection-read        Get Metadata
+GET     /collections/<uid>/                 No       collection      read     Get
 PUT     /collections/<uid>/                                collection-modify      Modify Metadata
 DELETE  /collections/<uid>/                                collection-delete      Delete Collection
 GET     /collections/<uid>/secrets/                        collection-read        List Secrets
-POST    /collections/<uid>/secrets/                        collection-create      Create Secret
 GET     /collections/<uid>/secrets/<uid>/                  collection-read        Get Metadata
 PUT     /collections/<uid>/secrets/<uid>/                  collection-modify      Create New Version
 DELETE  /collections/<uid>/secrets/<uid>/                  collection-delete      Delete All Versions
