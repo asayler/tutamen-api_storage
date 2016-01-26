@@ -14,9 +14,3 @@ class APIError(Exception):
 
 class TokensError(APIError):
     pass
-
-class SSLError(APIError):
-    pass
-
-class SSLClientCertError(SSLError):
-    pass
